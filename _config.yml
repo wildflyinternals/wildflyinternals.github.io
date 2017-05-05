@@ -1,3 +1,7 @@
 theme: minima
 title: Wildfly Internals
 author: 2017 -  wildflyinternals.io
+google_analytics: UA-98621149-1
+disqus:
+  shortname: wildflyinternals-io
+
