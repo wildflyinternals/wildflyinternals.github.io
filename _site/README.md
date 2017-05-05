@@ -1,1 +1,1 @@
-weinan.io
+http://wildflyinternals.io
