@@ -1,5 +1,5 @@
 ---
-title: "Troubleshooting the Wildfly Startup Process"
+title: "Troubleshooting the Wildfly startup process"
 author: Weinan
 ---
 
