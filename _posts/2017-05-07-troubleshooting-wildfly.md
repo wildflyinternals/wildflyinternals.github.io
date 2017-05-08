@@ -1,5 +1,5 @@
 ---
-title: "Troubleshooting the Wildfly Startup Process"
+title: "Troubleshooting the Wildfly startup process"
 author: Weinan
 ---
 
@@ -190,4 +190,4 @@ As the screenshot shown above, we can click the bug icon to start the remote deb
 
 ![/assets/2017-05-07/jdbcstop.png](/assets/2017-05-07/jdbcstop.png)
 
-The above process shows us how to troubleshoot the Wildfly startup process. We will use way to analyze the Wildfly source code and see how it works in runtime. This article is a basis for the future topics I'd like to write.  
+The above process shows us how to troubleshoot the Wildfly startup process. We will this method to analyze the Wildfly source code and see how it works in runtime. This article is a basis for the future topics I'd like to write.
