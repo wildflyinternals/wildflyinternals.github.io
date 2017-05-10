@@ -7,6 +7,565 @@
     
       
         <item>
+          <title>An introduction to the JBoss Modular Service Container: Part 1 - Basic architecture of the container</title>
+          <description>&lt;p&gt;The &lt;code class=&quot;highlighter-rouge&quot;&gt;JBoss Modular Service Container&lt;/code&gt; project is the core part of the Wildfly application server, and it provides the Wildfly server the ability to install or remove components (called services) at runtime. In this series of articles, I’d like to make an introduction to the project.&lt;/p&gt;
+
+&lt;p&gt;This project is hosted on Github (most of the JBoss projects are hosted on Github), and the project name is &lt;code class=&quot;highlighter-rouge&quot;&gt;jboss-msc2&lt;/code&gt; (&lt;a href=&quot;https://github.com/jboss-msc/jboss-msc2&quot;&gt;https://github.com/jboss-msc/jboss-msc2&lt;/a&gt;). There is also a &lt;code class=&quot;highlighter-rouge&quot;&gt;jboss-msc&lt;/code&gt; project, but the &lt;code class=&quot;highlighter-rouge&quot;&gt;jboss-msc2&lt;/code&gt; is for the future, so I will focus on the newer one in this series of articles.&lt;/p&gt;
+
+&lt;p&gt;I won’t introduce the method to clone the project into you local machine in this article. You can read &lt;a href=&quot;http://wildflyinternals.io/2017/05/05/wildfly-src.html&quot;&gt;Fetching and compiling the Wildfly upstream source&lt;/a&gt; to get a basic idea on how to fetch and build the opensource projects from Github.&lt;/p&gt;
+
+&lt;p&gt;Basically, the service container can be divided into two parts. One part is the transaction layer, which is used to control the lifecycle of the service. The other part is the service layer, which defines the concepts like service container and service registries (Please note the project does not divide itself into two sub-modules or two layers explicitly, and we can just roughly divide it like this in our mind to help us to better understanding the whole project). We will check these concepts in more details in this series of articles.&lt;/p&gt;
+
+&lt;p&gt;Now let’s see the class diagram that contains classes related with the service layer:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/services.png&quot; alt=&quot;/assets/services.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The above diagram contains some classes that compose the design of the service container. There are fives interfaces we need to check in detail. They are &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceBuilder&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceContainer&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt;. Let check them one by one.&lt;/p&gt;
+
+&lt;p&gt;The first interface to check is &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceContainer&lt;/code&gt;. This is the container class, and it is created from the &lt;code class=&quot;highlighter-rouge&quot;&gt;newServiceContainer(...)&lt;/code&gt; method of &lt;code class=&quot;highlighter-rouge&quot;&gt;TransactionController&lt;/code&gt; class. We won’t touch much about the transaction layer here, but you need to know the concept of transaction in &lt;code class=&quot;highlighter-rouge&quot;&gt;jboss-msc2&lt;/code&gt; is not the same thing in database or transaction processing area. The concept of transaction in service container is more like a lifecycle controller and task executor of the services. We will check the details of transaction later.&lt;/p&gt;
+
+&lt;p&gt;Here is the diagram that shows our above analyzed result:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/container.png&quot; alt=&quot;/assets/container.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Now let’s come back to the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceContainer&lt;/code&gt; interface. Here is the code of the interface:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;package&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;org&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;jboss&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;msc&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;service&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.txn.InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.txn.UpdateTransaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.util.Listener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/**
+ * A service container. Implementations of this interface are thread safe.
+ *
+ * @author &amp;lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&amp;gt;David M. Lloyd&amp;lt;/a&amp;gt;
+ * @author &amp;lt;a href=&quot;mailto:frainone@redhat.com&quot;&amp;gt;Flavia Rainone&amp;lt;/a&amp;gt;
+ * @author &amp;lt;a href=&quot;mailto:ropalka@redhat.com&quot;&amp;gt;Richard Opalka&amp;lt;/a&amp;gt;
+ */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ServiceContainer&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Creates new registry associated with this container.
+     *
+     * @param transaction the transaction
+     * @return container registry
+     * @throws IllegalStateException if container have been shutdown
+     */&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;ServiceRegistry&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;newRegistry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Shuts down the container, removing all registries and their services.
+     *
+     * @param transaction the transaction
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service container.
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     * @throws IllegalArgumentException if transaction was created by different transaction controller than this container
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;shutdown&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Shuts down the container, removing all registries and their services.
+     *
+     * @param transaction the transaction
+     * @param completionListener called when operation is finished
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service container.
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     * @throws IllegalArgumentException if transaction was created by different transaction controller than this container
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;shutdown&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Listener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ServiceContainer&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The above code contains the methods that the container provides and it has document to describe the purpose of these methods. We can see a container can contain multiple service registries represented by &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt; interface. The container can also be shutdown with &lt;code class=&quot;highlighter-rouge&quot;&gt;shutdown(...)&lt;/code&gt; methods, and all the services in the container will be closed and their registries will be removed. There are transactions and listeners associated with these actions (&lt;code class=&quot;highlighter-rouge&quot;&gt;UpdateTransaction&lt;/code&gt; class and &lt;code class=&quot;highlighter-rouge&quot;&gt;Listener&lt;/code&gt; interface are passed into the methods).&lt;/p&gt;
+
+&lt;p&gt;The container relies on the associated transaction to manage its   state transitions, and these transitions are asynchronous actions, so it needs a callback listener after the action is done. We will check the detail of this part of the design later in this series of articles.&lt;/p&gt;
+
+&lt;p&gt;Now let’s check the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt; interface. Here is the code of the interface:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;package&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;org&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;jboss&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;msc&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;service&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.txn.InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.txn.UpdateTransaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.util.Listener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/**
+ * A service registry. Implementations of this interface are thread safe.
+ *
+ * @author &amp;lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&amp;gt;David M. Lloyd&amp;lt;/a&amp;gt;
+ * @author &amp;lt;a href=&quot;mailto:frainone@redhat.com&quot;&amp;gt;Flavia Rainone&amp;lt;/a&amp;gt;
+ * @author &amp;lt;a href=&quot;mailto:ropalka@redhat.com&quot;&amp;gt;Richard Opalka&amp;lt;/a&amp;gt;
+ */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ServiceRegistry&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Gets a service controller, throwing an exception if it is not found.
+     *
+     * @param serviceName the service name
+     * @param &amp;lt;T&amp;gt; service controller value type
+     * @return the service controller corresponding to {@code serviceName}
+     * @throws ServiceNotFoundException if the service is not present in the registry
+     */&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ServiceController&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;getRequiredService&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ServiceName&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;serviceName&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ServiceNotFoundException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Gets a service controller, returning {@code null} if it is not found.
+     *
+     * @param serviceName the service name
+     * @param &amp;lt;T&amp;gt; service controller value type
+     * @return the service controller corresponding to {@code serviceName}, or {@code null} if it is not found
+     */&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ServiceController&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;getService&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ServiceName&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;serviceName&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Disables this registry and all its services, causing {@code UP} services to stop.
+     *
+     * @param transaction the transaction
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service registry.
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     * @throws IllegalArgumentException if transaction was created by different transaction controller than this registry
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;disable&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Enables this registry. As a result, its services may start, depending on their
+     * {@link org.jboss.msc.service.ServiceMode mode} rules.
+     * &amp;lt;p&amp;gt; Registries are enabled by default.
+     *
+     * @param transaction the transaction
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service registry.
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     * @throws IllegalArgumentException if transaction was created by different transaction controller than this registry
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;enable&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Removes this registry from the container.
+     *
+     * @param transaction the transaction
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service registry.
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     * @throws IllegalArgumentException if transaction was created by different transaction controller than this registry
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;remove&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Removes this registry from the container.
+     *
+     * @param transaction the transaction
+     * @param completionListener called when operation is finished
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service registry.
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     * @throws IllegalArgumentException if transaction was created by different transaction controller than this registry
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;remove&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Listener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ServiceRegistry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above code, we can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt; includes many services, and it have &lt;code class=&quot;highlighter-rouge&quot;&gt;getService(...)&lt;/code&gt; method to fetch the include services. In addition, it has &lt;code class=&quot;highlighter-rouge&quot;&gt;remove(...)&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;enable(...)&lt;/code&gt; methods to manage its lifecycle in container.’&lt;/p&gt;
+
+&lt;p&gt;We need to take caution that the &lt;code class=&quot;highlighter-rouge&quot;&gt;getService(...)&lt;/code&gt; method will get an instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt; as its returned data, instead of the services itself. The &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt; interface defines a model to control the lifecycle of its service. The real service is represented by &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt; interface, and there is a &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration&lt;/code&gt; class stores a &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt; with its &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceName&lt;/code&gt;. The following diagram shows the relationship of these classes:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/servicecontroller.png&quot; alt=&quot;/assets/servicecontroller.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The above diagram shows that the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt; is the interface that manages the lifecycle of the underlying service. Here is part of the code in &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt; interface:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;package&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;org&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;jboss&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;msc&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;service&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.txn.InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.txn.UpdateTransaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.util.Listener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+
+&lt;span class=&quot;cm&quot;&gt;/**
+ * A controller for a single service instance.
+ *
+ * @author &amp;lt;a href=&quot;mailto:frainone@redhat.com&quot;&amp;gt;Flavia Rainone&amp;lt;/a&amp;gt;
+ * @author &amp;lt;a href=&quot;mailto:ropalka@redhat.com&quot;&amp;gt;Richard Opalka&amp;lt;/a&amp;gt;
+ * @param &amp;lt;T&amp;gt; service type
+ */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;ServiceController&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Disables a service, causing this service to stop if it is {@code UP}.
+     *
+     * @param transaction the transaction
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service controller.
+     * @throws IllegalStateException if controller was removed
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;disable&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Enables the service, which may start as a result, according to its {@link org.jboss.msc.service.ServiceMode mode} rules.
+     * &amp;lt;p&amp;gt; Services are enabled by default.
+     *
+     * @param transaction the transaction
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service controller.
+     * @throws IllegalStateException if controller was removed
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;enable&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Removes this service.&amp;lt;p&amp;gt;
+     * All dependent services will be automatically stopped as the result of this operation.
+     *
+     * @param transaction the transaction
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service controller.
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;remove&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Restarts this service.
+     * 
+     * @param transaction the transaction
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service controller.
+     * @throws IllegalStateException if controller was removed
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;restart&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Retries a failed service. Does nothing if the state has not failed.
+     *
+     * @param transaction the transaction
+     * @throws java.lang.IllegalArgumentException if &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt; is null
+     * or if transaction controller associated with &amp;lt;code&amp;gt;transaction&amp;lt;/code&amp;gt;
+     * is not the same as the one associated with this service controller.
+     * @throws IllegalStateException if controller was removed
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;retry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Replaces {@code service} by a new service.
+     *
+     * @param transaction the transaction
+     * @param newService the new service to be published
+     * @throws java.lang.IllegalArgumentException if any method parameter is &amp;lt;code&amp;gt;null&amp;lt;/code&amp;gt;
+     * @throws IllegalStateException if controller was removed
+     * @throws org.jboss.msc.txn.InvalidTransactionStateException if transaction is not active.
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;replace&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Service&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;newService&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Gets associated service.
+     * @return service
+     */&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;Service&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;getService&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above code, we can see that the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt; interface is the physical layer to control the &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt; lifecycle in container. The &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt; interface should be implemented by each service vendor. Here is the code of the &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt; interface:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;package&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;org&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;jboss&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;msc&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;service&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/**
+ * Service interface providing both start and stop methods to implementors.
+ * &amp;lt;p&amp;gt;
+ * Service implementors will have start invoked both on execution phase (when the service is being started) and during
+ * rollback (when a stop is being reverted). The same is valid for stop: it could be invoked during both execution
+ * and rollback stages of active transaction.
+ * 
+ * @param &amp;lt;T&amp;gt; the service value type
+ * 
+ * @author &amp;lt;a href=&quot;mailto:frainone@redhat.com&quot;&amp;gt;Flavia Rainone&amp;lt;/a&amp;gt;
+ */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Service&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Service start  method, invoked on execution and rollback (when needed to revert a previous stop).
+     * &amp;lt;p&amp;gt;
+     * Implementors must invoke {@link StartContext#complete(Object) startContext.complete(T)} upon completion.
+     * &amp;lt;p&amp;gt;
+     * Also, this method cannot be implemented asynchronously.
+     * 
+     * @param startContext the start context
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;StartContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;startContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Service stop method, invoked on execution and rollback (when needed to revert a previous start).
+     * &amp;lt;p&amp;gt;
+     * Implementors must invoke {@link StopContext#complete() stopContext.complete()} upon completion.
+     * &amp;lt;p&amp;gt;
+     * Also, this method cannot be implemented asynchronously.
+     * 
+     * @param stopContext the stop context
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;stop&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;StopContext&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;stopContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above code, we can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt; interface defines &lt;code class=&quot;highlighter-rouge&quot;&gt;start(...)&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;stop(...)&lt;/code&gt; methods for the users to implement. Wildfly contains many subsystems, and these systems will need to implement the &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt; interface to run in container. We can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;org.jboss.as.connector.subsystems.datasources.XADataSourceConfigService&lt;/code&gt; class (&lt;a href=&quot;https://github.com/wildfly/wildfly/blob/master/connector/src/main/java/org/jboss/as/connector/subsystems/datasources/XADataSourceConfigService.java&quot;&gt;XADataSourceConfigService.java&lt;/a&gt;) in Wildfly as an implementation example.&lt;/p&gt;
+
+&lt;p&gt;Seeing from the above diagram and code, we can understand the relationship between &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceContainer&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt;. Firstly, &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceContainer&lt;/code&gt; contains many &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt; instances. Here is the relative code in &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceContainerImpl&lt;/code&gt; class:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Set&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ServiceRegistryImpl&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registries&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;HashSet&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;gt;();&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Secondly, the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt; contains many &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration&lt;/code&gt; instances and belonging container. Here is the code in &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistryImpl&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ServiceContainerImpl&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;container&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;c1&quot;&gt;// map of service registrations&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ConcurrentMap&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ServiceName&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Registration&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ConcurrentHashMap&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;gt;();&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From above code, we can see the registrations are stored in a concurrent map data structure, and the key is service name. Actually the &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration&lt;/code&gt; class contains the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceName&lt;/code&gt; by itself. The purpose that &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt; stores a &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceName&lt;/code&gt; with &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration&lt;/code&gt; is for implementation requirement. We don’t have to dig deeper here right now.&lt;/p&gt;
+
+&lt;p&gt;Now let’s see the &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration&lt;/code&gt; class. It contains &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceName&lt;/code&gt;, &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt; and belonging &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt;. Here is the relative code in &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration&lt;/code&gt; class:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;cm&quot;&gt;/** Registration name */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ServiceName&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;serviceName&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;cm&quot;&gt;/** Associated registry */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ServiceRegistryImpl&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;cm&quot;&gt;/** Associated controller */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;AtomicReference&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ServiceControllerImpl&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;?&amp;gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;holderRef&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;AtomicReference&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;gt;();&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above data, we can see &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration&lt;/code&gt; is like a bridge between &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistry&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Finally we come to &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt;. It contains the instance of &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt; implementation and physically manage the service lifecycle with the help the transaction layer. We will check the transaction layer later, and that’s all for our analyze in container layer.&lt;/p&gt;
+
+&lt;p&gt;Finally, let’s check the shutdown process of &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceContainer&lt;/code&gt; to see how the call chains go through the above classes. Firstly let’s see the sequence diagram of the &lt;code class=&quot;highlighter-rouge&quot;&gt;shutdown(...)&lt;/code&gt; method in &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceContainerImpl&lt;/code&gt;:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/org.jboss.msc.txn.ServiceContainerImpl.shutdown(UpdateTransaction, Listener_ServiceContainer_).png&quot; alt=&quot;/assets/org.jboss.msc.txn.ServiceContainerImpl.shutdown(UpdateTransaction, Listener_ServiceContainer_).png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;In above sequence diagram, we can see there is a loop to fetch the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistryImpl&lt;/code&gt; instances from &lt;code class=&quot;highlighter-rouge&quot;&gt;registries&lt;/code&gt;, and then the &lt;code class=&quot;highlighter-rouge&quot;&gt;remove(...)&lt;/code&gt; method of &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistryImpl&lt;/code&gt; class instance will be called. Here is the relative code in &lt;code class=&quot;highlighter-rouge&quot;&gt;shutdown(...)&lt;/code&gt; methjod:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ServiceRegistryImpl&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registries&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;remove&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above code, we can see how the call chain goes to &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistryImpl.remove(...)&lt;/code&gt; method. Now let’s check the sequence diagram of the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistryImpl.remove(...)&lt;/code&gt; method:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/org.jboss.msc.txn.ServiceRegistryImpl.remove(UpdateTransaction, Listener_ServiceRegistry_).png&quot; alt=&quot;/assets/org.jboss.msc.txn.ServiceRegistryImpl.remove(UpdateTransaction, Listener_ServiceRegistry_).png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;From the above diagram, we can see the main logic is to create a &lt;code class=&quot;highlighter-rouge&quot;&gt;RemoveTask&lt;/code&gt; to remove the installed services. &lt;code class=&quot;highlighter-rouge&quot;&gt;RemoveTask&lt;/code&gt; is an inner class of the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistryImpl&lt;/code&gt; class. We can see the remove action is implemented asynchronously. &lt;code class=&quot;highlighter-rouge&quot;&gt;removeObservers&lt;/code&gt; are used to observe the remove task execution, and &lt;code class=&quot;highlighter-rouge&quot;&gt;completionListener&lt;/code&gt; is called after the execution is finished. Here is the relative code of the above process:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;synchronized&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;lock&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Bits&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;allAreClear&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;state&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;REMOVED&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;))&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;state&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kt&quot;&gt;byte&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;state&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;REMOVED&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;installedServices&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;RemoveTask&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;removeTask&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;RemoveTask&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;getAbstractTransaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;getTaskFactory&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;().&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;newTask&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;removeTask&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;release&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;null&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;removeObservers&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NotificationEntry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;removeObservers&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// don't call completion listener&lt;/span&gt;
+        &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;container&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;registryRemoved&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;null&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;safeCallListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// open call&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The above code shows how the &lt;code class=&quot;highlighter-rouge&quot;&gt;RemoveTask&lt;/code&gt; is created and called asynchronously. Now let’s see the class diagram of &lt;code class=&quot;highlighter-rouge&quot;&gt;RemoveTask&lt;/code&gt;:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/RemoveTask.png&quot; alt=&quot;/assets/RemoveTask.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Because &lt;code class=&quot;highlighter-rouge&quot;&gt;RemoveTask&lt;/code&gt; is a inner class of the &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceRegistryImpl&lt;/code&gt; class, so I keep the relationship in above diagram. Now let’s check how does RemoveTask performs the remove action. Here is the code of the &lt;code class=&quot;highlighter-rouge&quot;&gt;RemoveTask&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;RemoveTask&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;implements&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Executable&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Void&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;kd&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Transaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+    &lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;RemoveTask&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Transaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;txn&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+
+    &lt;span class=&quot;nd&quot;&gt;@Override&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;execute&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ExecuteContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Void&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;try&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;kd&quot;&gt;synchronized&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ServiceRegistryImpl&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;lock&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Registration&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registration&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;values&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+                    &lt;span class=&quot;n&quot;&gt;registration&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;remove&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+                &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;clear&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+            &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;finally&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;complete&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+        &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above code, we can see &lt;code class=&quot;highlighter-rouge&quot;&gt;RemoveTask&lt;/code&gt; implements the &lt;code class=&quot;highlighter-rouge&quot;&gt;org.jboss.msc.txn.Executable&lt;/code&gt; interface. Here is the code of &lt;code class=&quot;highlighter-rouge&quot;&gt;org.jboss.msc.txn.Executable&lt;/code&gt; interface:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;package&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;org&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;jboss&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;msc&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/**
+ * A task that may succeed or fail which may also produce a consumable result.  If no result
+ * is generated by this task, then its type should be {@code Void}.
+ *
+ * @param &amp;lt;T&amp;gt; the result type of this task
+ * @author &amp;lt;a href=&quot;mailto:david.lloyd@redhat.com&quot;&amp;gt;David M. Lloyd&amp;lt;/a&amp;gt;
+ */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;interface&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Executable&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+
+    &lt;span class=&quot;cm&quot;&gt;/**
+     * Perform the task.
+     *
+     * @param context execution context
+     */&lt;/span&gt;
+    &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;execute&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ExecuteContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above code, we can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;Executable&lt;/code&gt; defines a &lt;code class=&quot;highlighter-rouge&quot;&gt;execute(...)&lt;/code&gt; method for its represented task to be executed. Now we can go back to the &lt;code class=&quot;highlighter-rouge&quot;&gt;execute(...)&lt;/code&gt; method implementation in &lt;code class=&quot;highlighter-rouge&quot;&gt;RemoveTask&lt;/code&gt;. Here is the main logic in the code:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;for&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Registration&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registration&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;:&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;values&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;registration&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;remove&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;clear&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above code, we can see the registrations in registry will be traversed and their &lt;code class=&quot;highlighter-rouge&quot;&gt;remove(...)&lt;/code&gt; method will be called. Finally the registry itself will be cleared by calling its &lt;code class=&quot;highlighter-rouge&quot;&gt;clear()&lt;/code&gt; method.&lt;/p&gt;
+
+&lt;p&gt;Now we can go into the &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration.remove(...)&lt;/code&gt; method to see its logic. Here is the sequence diagram of the &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration.remove(...)&lt;/code&gt; method:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/org.jboss.msc.txn.Registration.remove(Transaction).png&quot; alt=&quot;/assets/org.jboss.msc.txn.Registration.remove(Transaction).png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;From the above diagram, we can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;Registration.remove(...)&lt;/code&gt; method will call the &lt;code class=&quot;highlighter-rouge&quot;&gt;_remove(...)&lt;/code&gt; method of the included &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceController&lt;/code&gt; instance.&lt;/p&gt;
+
+&lt;p&gt;The above study shows us how does the service container shutdown itself. It will shutdown the containing service registries, and service registry will remove its registrations and then clear registry itself. The registration will use service controller to shutdown the containing service.&lt;/p&gt;
+
+&lt;p&gt;We haven’t checked the implementation of the &lt;code class=&quot;highlighter-rouge&quot;&gt;_remove(...)&lt;/code&gt; method in &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceControllerImpl&lt;/code&gt;, now let’s see the code of the &lt;code class=&quot;highlighter-rouge&quot;&gt;_remove(...)&lt;/code&gt; method in &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceControllerImpl&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;_remove&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Transaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Listener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;ServiceController&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;throws&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;IllegalArgumentException&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;InvalidTransactionStateException&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;synchronized&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;lock&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;while&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;isServiceRemoved&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;state&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SERVICE_REMOVED&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;transition&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;null&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;getState&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;()&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;!=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;STATE_REMOVED&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;removeObservers&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;NotificationEntry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;removeObservers&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt; &lt;span class=&quot;c1&quot;&gt;// don't call completion listener&lt;/span&gt;
+        &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;safeCallListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;completionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The main logic of above code is this part:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;k&quot;&gt;while&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kc&quot;&gt;true&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;isServiceRemoved&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;state&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;|=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;SERVICE_REMOVED&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;n&quot;&gt;transition&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;In above code, we can see the lifecycle of the service is controlled by &lt;code class=&quot;highlighter-rouge&quot;&gt;state&lt;/code&gt;, and the state change is controlled by &lt;code class=&quot;highlighter-rouge&quot;&gt;transition(...)&lt;/code&gt; method. Here is the sequence diagram of the &lt;code class=&quot;highlighter-rouge&quot;&gt;transition(...)&lt;/code&gt; method:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/org.jboss.msc.txn.ServiceControllerImpl.transition(Transaction).png&quot; alt=&quot;/assets/org.jboss.msc.txn.ServiceControllerImpl.transition(Transaction).png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;From the above diagram, we can see the service has an implicit state machine defined inside the &lt;code class=&quot;highlighter-rouge&quot;&gt;transition(...)&lt;/code&gt; method. And the state machine is powered by the transaction layer. We won’t check much detail of this level in this article and we can stop our investigation at this level for now. Here is the code of the above diagram:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;private&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;transition&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Transaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;assert&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;holdsLock&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;lock&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;boolean&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;removed&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;isServiceRemoved&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;switch&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;getState&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;case&lt;/span&gt; &lt;span class=&quot;nl&quot;&gt;STATE_DOWN:&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;unsatisfiedDependencies&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;amp;&amp;amp;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;shouldStart&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;setState&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;STATE_STARTING&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;StartServiceTask&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;create&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;else&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;removed&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;setState&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;STATE_REMOVING&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;RemoveServiceTask&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;create&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;case&lt;/span&gt; &lt;span class=&quot;nl&quot;&gt;STATE_UP:&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;unsatisfiedDependencies&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;||&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;shouldStop&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;lifecycleTime&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;System&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;nanoTime&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;setState&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;STATE_STOPPING&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;StopServiceTask&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;create&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;case&lt;/span&gt; &lt;span class=&quot;nl&quot;&gt;STATE_FAILED:&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;unsatisfiedDependencies&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;mi&quot;&gt;0&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;||&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;shouldStop&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;())&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;lifecycleTime&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;System&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;nanoTime&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;setState&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;STATE_STOPPING&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;StopFailedServiceTask&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;create&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;this&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;txn&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+            &lt;span class=&quot;k&quot;&gt;break&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above code, we can see &lt;code class=&quot;highlighter-rouge&quot;&gt;Transaction txn&lt;/code&gt; is passed into multiple tasks related with the service lifecycle. These tasks will physically control the lifecycle of the &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt; instance in service controller. For example, here is part of the &lt;code class=&quot;highlighter-rouge&quot;&gt;execute(...)&lt;/code&gt; method in &lt;code class=&quot;highlighter-rouge&quot;&gt;StopServiceTask&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;execute&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ExecuteContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Void&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Service&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;T&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;service&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;serviceController&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;getService&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+    &lt;span class=&quot;k&quot;&gt;if&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;service&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;==&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;null&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;serviceController&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;setServiceDown&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;serviceController&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;notifyServiceDown&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+        &lt;span class=&quot;n&quot;&gt;context&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;complete&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+        &lt;span class=&quot;k&quot;&gt;return&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;...&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;From the above code, we can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;StopServiceTask&lt;/code&gt; will in return call the &lt;code class=&quot;highlighter-rouge&quot;&gt;setServiceDown(...)&lt;/code&gt; method in its belonging service controller. The lower level of the state change needs to interact with the transaction layer, and we won’t check into deeper call chain now.&lt;/p&gt;
+
+&lt;p&gt;In this article, we have made a brief study on the service container design of the &lt;code class=&quot;highlighter-rouge&quot;&gt;jboss-msc2&lt;/code&gt; project. This project is the core part of the Wildfly application server, and it provides the application server the ability to install and uninstall modules at runtime. In the next article, I’ll introduce the transaction layer of the project.&lt;/p&gt;
+
+</description>
+          <pubDate>2017-05-10T00:00:00+00:00</pubDate>
+          <link>/2017/05/10/jboss-msc.html</link>
+          <guid isPermaLink="true">/2017/05/10/jboss-msc.html</guid>
+        </item>
+      
+    
+      
+        <item>
           <title>Troubleshooting the Wildfly startup process</title>
           <description>&lt;p&gt;In this article, I’d like to introduce to you how to using the standard &lt;code class=&quot;highlighter-rouge&quot;&gt;Java Debug Wire Protocol&lt;/code&gt;(See &lt;a href=&quot;http://docs.oracle.com/javase/1.5.0/docs/guide/jpda/jdwp-spec.html&quot;&gt;JavaTM Debug Wire Protocol&lt;/a&gt;) to connect to troubleshoot the Wildfly server in standalone mode. The first step is to look into the &lt;code class=&quot;highlighter-rouge&quot;&gt;standalone.sh&lt;/code&gt; script provided by the server.&lt;/p&gt;
 
