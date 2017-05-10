@@ -8,7 +8,7 @@
 
 <p>Now let’s see the class diagram that contains classes related with the service layer:</p>
 
-<p><img src="/assets/services.png" alt="/assets/services.png" /></p>
+<p><img src="/assets/msc/services.png" alt="/assets/msc/services.png" /></p>
 
 <p>The above diagram contains some classes that compose the design of the service container. There are fives interfaces we need to check in detail. They are <code class="highlighter-rouge">ServiceController</code>, <code class="highlighter-rouge">ServiceBuilder</code>, <code class="highlighter-rouge">ServiceRegistry</code>, <code class="highlighter-rouge">ServiceContainer</code> and <code class="highlighter-rouge">Service</code>. Let check them one by one.</p>
 
@@ -16,7 +16,7 @@
 
 <p>Here is the diagram that shows our above analyzed result:</p>
 
-<p><img src="/assets/container.png" alt="/assets/container.png" /></p>
+<p><img src="/assets/msc/container.png" alt="/assets/msc/container.png" /></p>
 
 <p>Now let’s come back to the <code class="highlighter-rouge">ServiceContainer</code> interface. Here is the code of the interface:</p>
 
@@ -172,7 +172,7 @@
 
 <p>We need to take caution that the <code class="highlighter-rouge">getService(...)</code> method will get an instance of <code class="highlighter-rouge">ServiceController</code> as its returned data, instead of the services itself. The <code class="highlighter-rouge">ServiceController</code> interface defines a model to control the lifecycle of its service. The real service is represented by <code class="highlighter-rouge">Service</code> interface, and there is a <code class="highlighter-rouge">Registration</code> class stores a <code class="highlighter-rouge">ServiceRegistry</code> with its <code class="highlighter-rouge">ServiceName</code>. The following diagram shows the relationship of these classes:</p>
 
-<p><img src="/assets/servicecontroller.png" alt="/assets/servicecontroller.png" /></p>
+<p><img src="/assets/msc/servicecontroller.png" alt="/assets/msc/servicecontroller.png" /></p>
 
 <p>The above diagram shows that the <code class="highlighter-rouge">ServiceController</code> is the interface that manages the lifecycle of the underlying service. Here is part of the code in <code class="highlighter-rouge">ServiceController</code> interface:</p>
 
@@ -352,7 +352,7 @@
 
 <p>Finally, let’s check the shutdown process of <code class="highlighter-rouge">ServiceContainer</code> to see how the call chains go through the above classes. Firstly let’s see the sequence diagram of the <code class="highlighter-rouge">shutdown(...)</code> method in <code class="highlighter-rouge">ServiceContainerImpl</code>:</p>
 
-<p><img src="/assets/org.jboss.msc.txn.ServiceContainerImpl.shutdown(UpdateTransaction, Listener_ServiceContainer_).png" alt="/assets/org.jboss.msc.txn.ServiceContainerImpl.shutdown(UpdateTransaction, Listener_ServiceContainer_).png" /></p>
+<p><img src="/assets/msc/org.jboss.msc.txn.ServiceContainerImpl.shutdown(UpdateTransaction, Listener_ServiceContainer_).png" alt="/assets/msc/org.jboss.msc.txn.ServiceContainerImpl.shutdown(UpdateTransaction, Listener_ServiceContainer_).png" /></p>
 
 <p>In above sequence diagram, we can see there is a loop to fetch the <code class="highlighter-rouge">ServiceRegistryImpl</code> instances from <code class="highlighter-rouge">registries</code>, and then the <code class="highlighter-rouge">remove(...)</code> method of <code class="highlighter-rouge">ServiceRegistryImpl</code> class instance will be called. Here is the relative code in <code class="highlighter-rouge">shutdown(...)</code> methjod:</p>
 
@@ -364,7 +364,7 @@
 
 <p>From the above code, we can see how the call chain goes to <code class="highlighter-rouge">ServiceRegistryImpl.remove(...)</code> method. Now let’s check the sequence diagram of the <code class="highlighter-rouge">ServiceRegistryImpl.remove(...)</code> method:</p>
 
-<p><img src="/assets/org.jboss.msc.txn.ServiceRegistryImpl.remove(UpdateTransaction, Listener_ServiceRegistry_).png" alt="/assets/org.jboss.msc.txn.ServiceRegistryImpl.remove(UpdateTransaction, Listener_ServiceRegistry_).png" /></p>
+<p><img src="/assets/msc/org.jboss.msc.txn.ServiceRegistryImpl.remove(UpdateTransaction, Listener_ServiceRegistry_).png" alt="/assets/msc/org.jboss.msc.txn.ServiceRegistryImpl.remove(UpdateTransaction, Listener_ServiceRegistry_).png" /></p>
 
 <p>From the above diagram, we can see the main logic is to create a <code class="highlighter-rouge">RemoveTask</code> to remove the installed services. <code class="highlighter-rouge">RemoveTask</code> is an inner class of the <code class="highlighter-rouge">ServiceRegistryImpl</code> class. We can see the remove action is implemented asynchronously. <code class="highlighter-rouge">removeObservers</code> are used to observe the remove task execution, and <code class="highlighter-rouge">completionListener</code> is called after the execution is finished. Here is the relative code of the above process:</p>
 
@@ -388,7 +388,7 @@
 
 <p>The above code shows how the <code class="highlighter-rouge">RemoveTask</code> is created and called asynchronously. Now let’s see the class diagram of <code class="highlighter-rouge">RemoveTask</code>:</p>
 
-<p><img src="/assets/RemoveTask.png" alt="/assets/RemoveTask.png" /></p>
+<p><img src="/assets/msc/RemoveTask.png" alt="/assets/msc/RemoveTask.png" /></p>
 
 <p>Because <code class="highlighter-rouge">RemoveTask</code> is a inner class of the <code class="highlighter-rouge">ServiceRegistryImpl</code> class, so I keep the relationship in above diagram. Now let’s check how does RemoveTask performs the remove action. Here is the code of the <code class="highlighter-rouge">RemoveTask</code>:</p>
 
@@ -453,7 +453,7 @@
 
 <p>Now we can go into the <code class="highlighter-rouge">Registration.remove(...)</code> method to see its logic. Here is the sequence diagram of the <code class="highlighter-rouge">Registration.remove(...)</code> method:</p>
 
-<p><img src="/assets/org.jboss.msc.txn.Registration.remove(Transaction).png" alt="/assets/org.jboss.msc.txn.Registration.remove(Transaction).png" /></p>
+<p><img src="/assets/msc/org.jboss.msc.txn.Registration.remove(Transaction).png" alt="/assets/msc/org.jboss.msc.txn.Registration.remove(Transaction).png" /></p>
 
 <p>From the above diagram, we can see the <code class="highlighter-rouge">Registration.remove(...)</code> method will call the <code class="highlighter-rouge">_remove(...)</code> method of the included <code class="highlighter-rouge">ServiceController</code> instance.</p>
 
@@ -493,7 +493,7 @@
 
 <p>In above code, we can see the lifecycle of the service is controlled by <code class="highlighter-rouge">state</code>, and the state change is controlled by <code class="highlighter-rouge">transition(...)</code> method. Here is the sequence diagram of the <code class="highlighter-rouge">transition(...)</code> method:</p>
 
-<p><img src="/assets/org.jboss.msc.txn.ServiceControllerImpl.transition(Transaction).png" alt="/assets/org.jboss.msc.txn.ServiceControllerImpl.transition(Transaction).png" /></p>
+<p><img src="/assets/msc/org.jboss.msc.txn.ServiceControllerImpl.transition(Transaction).png" alt="/assets/msc/org.jboss.msc.txn.ServiceControllerImpl.transition(Transaction).png" /></p>
 
 <p>From the above diagram, we can see the service has an implicit state machine defined inside the <code class="highlighter-rouge">transition(...)</code> method. And the state machine is powered by the transaction layer. We won’t check much detail of this level in this article and we can stop our investigation at this level for now. Here is the code of the above diagram:</p>
 
