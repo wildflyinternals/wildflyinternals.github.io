@@ -8,7 +8,7 @@
       
         <item>
           <title>Analyzing the JBoss Remoting Protocol</title>
-          <description>&lt;p&gt;In this article, I’d like to introduce the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting-wireshark&lt;/code&gt; (see &lt;a href=&quot;https://github.com/jboss-remoting/remoting-wireshark&quot;&gt;remoting-wireshark&lt;/a&gt;) project. This project is a Wireshark (Wireshark · Go Deep.](https://www.wireshark.org/)) dissector plugin that can decode the JBoss Remoting (see &lt;a href=&quot;http://jbossremoting.jboss.org/&quot;&gt;JBoss Remoting&lt;/a&gt;) protocol.&lt;/p&gt;
+          <description>&lt;p&gt;In this article, I’d like to introduce the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting-wireshark&lt;/code&gt; (see &lt;a href=&quot;https://github.com/jboss-remoting/remoting-wireshark&quot;&gt;remoting-wireshark&lt;/a&gt;) project. This project is a Wireshark &lt;a href=&quot;https://www.wireshark.org/&quot;&gt;Wireshark · Go Deep.&lt;/a&gt;) dissector plugin that can decode the JBoss Remoting (see &lt;a href=&quot;http://jbossremoting.jboss.org/&quot;&gt;JBoss Remoting&lt;/a&gt;) protocol.&lt;/p&gt;
 
 &lt;p&gt;Here is the screenshot that shows the running Wireshark that is decoding the JBoss Remoting protocol:&lt;/p&gt;
 
