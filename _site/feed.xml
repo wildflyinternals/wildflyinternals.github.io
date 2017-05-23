@@ -7,6 +7,323 @@
     
       
         <item>
+          <title>Analyzing the JBoss Remoting Protocol</title>
+          <description>&lt;p&gt;In this article, I’d like to introduce the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting-wireshark&lt;/code&gt; (see &lt;a href=&quot;https://github.com/jboss-remoting/remoting-wireshark&quot;&gt;remoting-wireshark&lt;/a&gt;) project. This project is a Wireshark (&lt;a href=&quot;https://www.wireshark.org/&quot;&gt;Wireshark · Go Deep.&lt;/a&gt;) dissector plugin that can decode the JBoss Remoting (see &lt;a href=&quot;http://jbossremoting.jboss.org/&quot;&gt;JBoss Remoting&lt;/a&gt;) protocol.&lt;/p&gt;
+
+&lt;p&gt;Here is the screenshot that shows the running Wireshark that is decoding the JBoss Remoting protocol:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/wireshark.png]&quot; alt=&quot;/assets/remoting/wireshark.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;From the above screenshot, we can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;Remoting&lt;/code&gt; protocol is decoded by the Wireshark.&lt;/p&gt;
+
+&lt;p&gt;Now let’s see how to enable the plugin. Firstly, you need to clone the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting-wireshark&lt;/code&gt; from Github into your local machine:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;language-url&quot;&gt;https://github.com/jboss-remoting/remoting-wireshark
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;Here is the code of the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting-wireshark&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;tree
+.
+├── Makefile
+├── src
+│   └── main.c
+└── target
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;We can see the project just contain a &lt;code class=&quot;highlighter-rouge&quot;&gt;main.c&lt;/code&gt; and a &lt;code class=&quot;highlighter-rouge&quot;&gt;Makefile&lt;/code&gt;. I have tested the &lt;code class=&quot;highlighter-rouge&quot;&gt;Makefile&lt;/code&gt; on my 64-bit Linux box.&lt;/p&gt;
+
+&lt;p&gt;At time of writing this article, there is a bug in the project which cause the plugin broken in Wireshark 2.x. I have submitted a PR to fix it (&lt;a href=&quot;https://github.com/jboss-remoting/remoting-wireshark/pull/3&quot;&gt;PR3&lt;/a&gt;) and you can apply the patch if you are running Wireshark 2.x. I have compiled the project in Fedora 25:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ cat /etc/*release
+Fedora release 25 (Twenty Five)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;And I have installed the Wireshark packages:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ dnf search wireshark*
+Last metadata expiration check: 23 days, 20:55:45 ago on Sat Apr 29 13:43:24 2017.
+wireshark-qt.x86_64 : Wireshark's Qt-based GUI
+wireshark-gtk.x86_64 : Wireshark's GTK+-based GUI
+wireshark.x86_64 : Network traffic analyzer
+wireshark-cli.x86_64 : Network traffic analyzer
+wireshark-devel.x86_64 : Development headers and libraries for wireshark
+openambit-wireshark.x86_64 : Wireshark dissector for openambit
+libvirt-wireshark.x86_64 : Wireshark dissector plugin for libvirt RPC transactions
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The above packages will provided Wireshark runtime and necessary header files and libraries to build against the remoting project. To compile the project, we can run the &lt;code class=&quot;highlighter-rouge&quot;&gt;make&lt;/code&gt; command in the project directory, and here is the output:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/make.png]&quot; alt=&quot;/assets/remoting/make.png&quot; /&gt;
+The above screenshot displays the compile process of the package, and the final output is &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting.so&lt;/code&gt;:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;cc -shared -lwiretap -o remoting.so target/main.o
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;After the compilation is done, we need to put &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting.so&lt;/code&gt; into the plugin directory of the Wireshark. Here is the command to do so:&lt;/p&gt;
+
+&lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;sudo cp remoting.so /usr/lib64/wireshark/plugins/
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The above command will put the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting.so&lt;/code&gt; into the wireshark plugin diretory defined by Fedora Linux. After the plugin is installed, we can start the Wireshark, and if everything goes fine, the plugin is loaded. We can check the &lt;code class=&quot;highlighter-rouge&quot;&gt;Analyze&lt;/code&gt; tab in the menu and select the &lt;code class=&quot;highlighter-rouge&quot;&gt;Enabled Protocols...&lt;/code&gt; item.&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/option.png]&quot; alt=&quot;/assets/remoting/option.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;After clicking the above item, we can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;Enabled Protocols&lt;/code&gt; window. Here is the screenshot:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/remoting.png]&quot; alt=&quot;/assets/remoting/remoting.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The above screenshot shows the enabled protocols. Wireshark will enable many protocols by default, so I have put the string &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting&lt;/code&gt; into the &lt;code class=&quot;highlighter-rouge&quot;&gt;Search&lt;/code&gt; field, and it shows that the &lt;code class=&quot;highlighter-rouge&quot;&gt;Remoting&lt;/code&gt; protocol plugin is already enabled.&lt;/p&gt;
+
+&lt;p&gt;To test the plugin, we can use the &lt;code class=&quot;highlighter-rouge&quot;&gt;jboss-remoting&lt;/code&gt; project itself generate some network traffic and let Wireshark capturing it. Here is the URL of the project:&lt;/p&gt;
+
+&lt;pre&gt;&lt;code class=&quot;language-url&quot;&gt;https://github.com/jboss-remoting/jboss-remoting
+&lt;/code&gt;&lt;/pre&gt;
+
+&lt;p&gt;You can clone the project and use the &lt;code class=&quot;highlighter-rouge&quot;&gt;mvn install&lt;/code&gt; command to compile and install it into your local machine. I won’t dive into much detail into this part. After the compilation is done, we can run the &lt;code class=&quot;highlighter-rouge&quot;&gt;ConnectionTestCase&lt;/code&gt; provided by the project to generate the network traffic. Here is the screenshot of the class:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/port.png]&quot; alt=&quot;/assets/remoting/port.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The above screenshot shows the tcp port used by &lt;code class=&quot;highlighter-rouge&quot;&gt;ConnectionTestCase&lt;/code&gt; class is &lt;code class=&quot;highlighter-rouge&quot;&gt;30123&lt;/code&gt;. So we can set Wireshark to listen to &lt;code class=&quot;highlighter-rouge&quot;&gt;lo&lt;/code&gt; loop interface and filter the data packet to show the data transferred via tcp port &lt;code class=&quot;highlighter-rouge&quot;&gt;30123&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;To select the interface to capture, we can select the &lt;code class=&quot;highlighter-rouge&quot;&gt;Capture -&amp;gt; Options...&lt;/code&gt; item as shown in following screenshot:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/capture.png]&quot; alt=&quot;/assets/remoting/capture.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;After click the above item, we enter the following window:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/lo.png]&quot; alt=&quot;/assets/remoting/lo.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;In above window, we can select the &lt;code class=&quot;highlighter-rouge&quot;&gt;lo&lt;/code&gt; interface for data capturing. After selecting the interface, we can click the &lt;code class=&quot;highlighter-rouge&quot;&gt;start&lt;/code&gt; button in above window to start the data capture. Then we will enter the main window of the Wireshark and see data are captured for &lt;code class=&quot;highlighter-rouge&quot;&gt;lo&lt;/code&gt; interface. Now we need to write a filter to show the data on port &lt;code class=&quot;highlighter-rouge&quot;&gt;30123&lt;/code&gt; only. Here is the filter setting:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/filter.png]&quot; alt=&quot;/assets/remoting/filter.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;Now the Wireshark is prepared to capture the network data. We can run the &lt;code class=&quot;highlighter-rouge&quot;&gt;ConnectionTestCase&lt;/code&gt; in &lt;code class=&quot;highlighter-rouge&quot;&gt;jboss-remoting&lt;/code&gt; project, and it will transfer the network data with &lt;code class=&quot;highlighter-rouge&quot;&gt;Remoting&lt;/code&gt; protocol. In Wireshark you can see a lot of data packets captured, but they are just decoded as plain TCP packets. Now we can right click one of packet to display the popup window, and select the &lt;code class=&quot;highlighter-rouge&quot;&gt;Decode As...&lt;/code&gt; item. Here is the screenshot:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/decode.png]&quot; alt=&quot;/assets/remoting/decode.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;After the clicking the above item, you can see a drop menu that can choose the protocol to use for decoding. Here is the screenshot:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;[/assets/remoting/select.png]&quot; alt=&quot;/assets/remoting/select.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;And then you can click the &lt;code class=&quot;highlighter-rouge&quot;&gt;TCP port&lt;/code&gt; and a very long droplist will appear. You can select &lt;code class=&quot;highlighter-rouge&quot;&gt;JBoss Remoting&lt;/code&gt; as the protocol, and then the packet will be decoded correctly.&lt;/p&gt;
+
+&lt;p&gt;After the above steps are done, you will see the JBoss Remoting packets displayed in Wireshark window as shown at the beginning of this article.&lt;/p&gt;
+
+</description>
+          <pubDate>2017-05-23T00:00:00+00:00</pubDate>
+          <link>/2017/05/23/remoting.html</link>
+          <guid isPermaLink="true">/2017/05/23/remoting.html</guid>
+        </item>
+      
+    
+      
+        <item>
+          <title>DRAFT - An introduction to the JBoss Modular Service Container: Part 2 - Transaction layer</title>
+          <description>&lt;p&gt;Here is the diagram that shows both the transaction layer and the container layer:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/msc/transaction_container.jpg&quot; alt=&quot;assets/transaction_container.jpg&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;From the diagram, we can see whole system can be roughly divided into two parts. The bottom left corner is the container layer, and the up right corner is the transaction layer. The connection point is &lt;code class=&quot;highlighter-rouge&quot;&gt;ServiceContainerImpl &amp;lt;-&amp;gt; TransactionController&lt;/code&gt;.&lt;/p&gt;
+
+&lt;p&gt;Here is the diagram that shows the transaction layer only:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/msc/transaction_layer.jpg&quot; alt=&quot;assets/msc/transaction_layer.jpg&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;There are two kinds of transactions by design. One is &lt;code class=&quot;highlighter-rouge&quot;&gt;ReadTransaction&lt;/code&gt; and the other is &lt;code class=&quot;highlighter-rouge&quot;&gt;UpdateTransaction&lt;/code&gt;. Here is the relationship of them:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/msc/transaction.png&quot; alt=&quot;assets/msc/transaction.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The above diagram shows that the &lt;code class=&quot;highlighter-rouge&quot;&gt;ReadTransaction&lt;/code&gt; interface extends the &lt;code class=&quot;highlighter-rouge&quot;&gt;Transaction&lt;/code&gt; interface, and &lt;code class=&quot;highlighter-rouge&quot;&gt;UpdateTransaction&lt;/code&gt; extends from the &lt;code class=&quot;highlighter-rouge&quot;&gt;ReadTransaction&lt;/code&gt;. When we want to use the transaction controller to create the service container, or adding services into the container, or removing services from the container, then we need the &lt;code class=&quot;highlighter-rouge&quot;&gt;UpdateTransaction&lt;/code&gt; as a handle to request the controller to take these actions. We will see the detail usage of the update transaction later.&lt;/p&gt;
+
+&lt;h2 id=&quot;a-sample-container&quot;&gt;A sample container&lt;/h2&gt;
+
+&lt;p&gt;Here is the demo code and my comment:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;package io.weli.jboss.msc2;
+
+import org.jboss.msc.service.*;
+import org.jboss.msc.txn.Transaction;
+import org.jboss.msc.txn.TransactionController;
+import org.jboss.msc.txn.UpdateTransaction;
+import org.jboss.msc.util.CompletionListener;
+
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
+
+/**
+ * Created by weli on 16/05/2017.
+ */
+public class Play {
+    public static void main(String[] args) {
+
+        TransactionController controller = TransactionController.newInstance();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The above line will create a new instance of the &lt;code class=&quot;highlighter-rouge&quot;&gt;TransactionController&lt;/code&gt;.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;final CompletionListener&amp;lt;UpdateTransaction&amp;gt; updateListener = new CompletionListener&amp;lt;&amp;gt;();
+
+controller.newUpdateTransaction(Executors.newSingleThreadExecutor(), updateListener);
+
+final UpdateTransaction transaction = updateListener.awaitCompletionUninterruptibly();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;Nearly all the actions in the container are asynchronous. The above code creates a transaction. You can think a transaction as a handler provided by &lt;code class=&quot;highlighter-rouge&quot;&gt;TransactionController&lt;/code&gt; to control the whole lifecycle of the service container. The transaction will be used to create service container, register services into container, and it is associated with an executor. We will see the usage of the &lt;code class=&quot;highlighter-rouge&quot;&gt;UpdateTransaction&lt;/code&gt; later.&lt;/p&gt;
+
+&lt;p&gt;The above transaction creation action is executed asynchronously, so we need to create a &lt;code class=&quot;highlighter-rouge&quot;&gt;CompletionListener&lt;/code&gt; in above code to wait for the transaction creation to be done by the controller, and finally we get the &lt;code class=&quot;highlighter-rouge&quot;&gt;UpdateTransaction&lt;/code&gt; from the listener.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;        try {
+            ServiceContainer container = controller.newServiceContainer(transaction);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;We get the service container from the service controller as shown above. Please see the usage of transaction. The update transaction is associated with every action issued by the controller, and the transaction will be prepared and committed at last to modify the service container statuses. We will see this in following code.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;            ServiceRegistry registry = container.newRegistry(transaction);
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The service registry is created from the container, and it will be used to include services.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;            ServiceBuilder&amp;lt;Void&amp;gt; serviceBuilder = controller.newServiceContext(transaction).addService(registry, ServiceName.of(&quot;foo&quot;));
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The above code will add a service named &lt;code class=&quot;highlighter-rouge&quot;&gt;foo&lt;/code&gt; into the service registry, and it will return a service builder for the service name to be connected with a real service. The following code defines a service:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;            class FooService implements Service&amp;lt;Void&amp;gt; {
+
+                @Override
+                public void start(StartContext&amp;lt;Void&amp;gt; startContext) {
+                    System.out.println(&quot;Foo service started.&quot;);
+                }
+
+                @Override
+                public void stop(StopContext stopContext) {
+                    System.out.println(&quot;Foo service stopped.&quot;);
+                }
+            }
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The above code defines a &lt;code class=&quot;highlighter-rouge&quot;&gt;FooService&lt;/code&gt; that implements the &lt;code class=&quot;highlighter-rouge&quot;&gt;Service&lt;/code&gt; interface. It’s a service just does nothing but just output some log.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;            serviceBuilder.setService(new FooService());
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The above code used the service builder to connect the service to its service name.&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;            serviceBuilder.install();
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;The above code used the service builder to install the service into registry. Until now we have finished the work to create a service container and put a service registry into the container, and we have created our service and associated it with the registry. Now we should commit the transaction and all the above actions will be persisted in container. Here is the final code:&lt;/p&gt;
+
+&lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;        } finally {
+            final CompletionListener&amp;lt;Transaction&amp;gt; prepareListener = new CompletionListener&amp;lt;&amp;gt;();
+            controller.prepare(transaction, prepareListener);
+            prepareListener.awaitCompletionUninterruptibly();
+
+            final CompletionListener&amp;lt;Transaction&amp;gt; commitListener = new CompletionListener&amp;lt;&amp;gt;();
+            controller.commit(transaction, commitListener);
+            commitListener.awaitCompletionUninterruptibly();
+        }
+    }
+}
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+&lt;p&gt;We can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;prepare(...)&lt;/code&gt; and &lt;code class=&quot;highlighter-rouge&quot;&gt;commit(...)&lt;/code&gt; actions are all related with the update transaction, and these actions are all executed asynchronously. We can see the container relies on the transaction handle to manage its consistency of the internal state. All the actions are associated with the update transaction, and after the update transaction is committed, the actions will alter the container state.&lt;/p&gt;
+
+&lt;p&gt;In addition, there is only one update transaction can be in action at one time. It does not allow multiple threads to get many update transactions to alter container internal services and their statuses at one time. If there are many threads requesting the update transactions, only one thread will succeed and others need to wait.&lt;/p&gt;
+
+&lt;p&gt;Here is the relative code in &lt;code class=&quot;highlighter-rouge&quot;&gt;org.jboss.msc.txn.AbstractTransaction.registerUpdateTransaction(...)&lt;/code&gt; method:&lt;/p&gt;
+
+&lt;p&gt;&lt;img src=&quot;/assets/msc/registerUpdateTransaction.png&quot; alt=&quot;assets/msc/registerUpdateTransaction.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;From the above diagram, we can see if there are more than one update transaction creation requests, the requested update transactions will be put into &lt;code class=&quot;highlighter-rouge&quot;&gt;pendingTxns&lt;/code&gt; queue, and there is only one running update transaction allowed and the listener will be called to return the transaction to the caller. The other callers will be blocked if they call their completion listeners.&lt;/p&gt;
+
+&lt;p&gt;Here is the complete code:&lt;/p&gt;
+
+&lt;div class=&quot;language-java highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.service.*&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.txn.Transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.txn.TransactionController&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.txn.UpdateTransaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;org.jboss.msc.util.CompletionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;java.util.concurrent.Executor&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;java.util.concurrent.Executors&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+&lt;span class=&quot;kn&quot;&gt;import&lt;/span&gt; &lt;span class=&quot;nn&quot;&gt;java.util.concurrent.ThreadPoolExecutor&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;;&lt;/span&gt;
+
+&lt;span class=&quot;cm&quot;&gt;/**
+ * Created by weli on 16/05/2017.
+ */&lt;/span&gt;
+&lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;Play&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+    &lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;static&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;main&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;String&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;[]&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;args&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+
+        &lt;span class=&quot;n&quot;&gt;TransactionController&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;controller&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;TransactionController&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;newInstance&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+
+        &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;CompletionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;updateListener&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;CompletionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;gt;();&lt;/span&gt;
+
+        &lt;span class=&quot;n&quot;&gt;controller&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;newUpdateTransaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Executors&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;newSingleThreadExecutor&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(),&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;updateListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+
+        &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;UpdateTransaction&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;updateListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;awaitCompletionUninterruptibly&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+        
+        &lt;span class=&quot;kd&quot;&gt;class&lt;/span&gt; &lt;span class=&quot;nc&quot;&gt;FooService&lt;/span&gt; &lt;span class=&quot;kd&quot;&gt;implements&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;Service&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Void&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+
+            &lt;span class=&quot;nd&quot;&gt;@Override&lt;/span&gt;
+            &lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;start&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;StartContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Void&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;startContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;System&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;println&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;Foo service started.&quot;&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+
+            &lt;span class=&quot;nd&quot;&gt;@Override&lt;/span&gt;
+            &lt;span class=&quot;kd&quot;&gt;public&lt;/span&gt; &lt;span class=&quot;kt&quot;&gt;void&lt;/span&gt; &lt;span class=&quot;nf&quot;&gt;stop&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;StopContext&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;stopContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;)&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+                &lt;span class=&quot;n&quot;&gt;System&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;out&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;println&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;Foo service stopped.&quot;&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+        &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+
+
+        &lt;span class=&quot;k&quot;&gt;try&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;ServiceContainer&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;container&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;controller&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;newServiceContainer&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;ServiceRegistry&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;container&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;newRegistry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;ServiceBuilder&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Void&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;serviceBuilder&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;controller&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;newServiceContext&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;).&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;addService&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;registry&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;ServiceName&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;of&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;foo&quot;&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;));&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;serviceBuilder&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;setService&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;FooService&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;());&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;serviceBuilder&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;install&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;controller&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;downgrade&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;kc&quot;&gt;null&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+
+        &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;finally&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;{&lt;/span&gt;
+            &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;CompletionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;prepareListener&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;CompletionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;gt;();&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;controller&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;prepare&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;prepareListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;prepareListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;awaitCompletionUninterruptibly&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+
+            &lt;span class=&quot;kd&quot;&gt;final&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;CompletionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;Transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;gt;&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;commitListener&lt;/span&gt; &lt;span class=&quot;o&quot;&gt;=&lt;/span&gt; &lt;span class=&quot;k&quot;&gt;new&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;CompletionListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;&amp;lt;&amp;gt;();&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;controller&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;commit&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;(&lt;/span&gt;&lt;span class=&quot;n&quot;&gt;transaction&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;,&lt;/span&gt; &lt;span class=&quot;n&quot;&gt;commitListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;);&lt;/span&gt;
+            &lt;span class=&quot;n&quot;&gt;commitListener&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;.&lt;/span&gt;&lt;span class=&quot;na&quot;&gt;awaitCompletionUninterruptibly&lt;/span&gt;&lt;span class=&quot;o&quot;&gt;();&lt;/span&gt;
+        &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+    &lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;span class=&quot;o&quot;&gt;}&lt;/span&gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;/div&gt;
+
+</description>
+          <pubDate>2017-05-21T00:00:00+00:00</pubDate>
+          <link>/2017/05/21/jboss-msc2.html</link>
+          <guid isPermaLink="true">/2017/05/21/jboss-msc2.html</guid>
+        </item>
+      
+    
+      
+        <item>
           <title>An introduction to the JBoss Modular Service Container: Part 1 - Basic architecture of the container</title>
           <description>&lt;p&gt;The &lt;code class=&quot;highlighter-rouge&quot;&gt;JBoss Modular Service Container&lt;/code&gt; project is the core part of the Wildfly application server, and it provides the Wildfly server the ability to install or remove components (called services) at runtime. In this series of articles, I’d like to make an introduction to the project.&lt;/p&gt;
 
