@@ -16,12 +16,12 @@
 
 &lt;p&gt;From the above screenshot, we can see the &lt;code class=&quot;highlighter-rouge&quot;&gt;Remoting&lt;/code&gt; protocol is decoded by the Wireshark.&lt;/p&gt;
 
-&lt;p&gt;Now let’s see how to enable the plugin. Firstly, you need to clone the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting-wireshark&lt;/code&gt; from Github into your local machine:&lt;/p&gt;
+&lt;p&gt;Now let’s see how to enable the plugin. Firstly, you need to clone the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting-wireshark&lt;/code&gt; from Github into your local machine. Here is the URL of the project:&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&quot;language-url&quot;&gt;https://github.com/jboss-remoting/remoting-wireshark
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;Here is the code of the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting-wireshark&lt;/code&gt;:&lt;/p&gt;
+&lt;p&gt;After cloning the above repository, we can see the code of the project:&lt;/p&gt;
 
 &lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;tree
 .
@@ -32,16 +32,16 @@
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
-&lt;p&gt;We can see the project just contain a &lt;code class=&quot;highlighter-rouge&quot;&gt;main.c&lt;/code&gt; and a &lt;code class=&quot;highlighter-rouge&quot;&gt;Makefile&lt;/code&gt;. I have tested the &lt;code class=&quot;highlighter-rouge&quot;&gt;Makefile&lt;/code&gt; on my 64-bit Linux box.&lt;/p&gt;
-
-&lt;p&gt;At time of writing this article, there is a bug in the project which cause the plugin broken in Wireshark 2.x. I have submitted a PR to fix it (PR3](https://github.com/jboss-remoting/remoting-wireshark/pull/3)) and you can apply the patch if you are running Wireshark 2.x. I have compiled the project in Fedora 25:&lt;/p&gt;
+&lt;p&gt;From the above output, we can see the project just contain a &lt;code class=&quot;highlighter-rouge&quot;&gt;main.c&lt;/code&gt; and a &lt;code class=&quot;highlighter-rouge&quot;&gt;Makefile&lt;/code&gt;. The &lt;code class=&quot;highlighter-rouge&quot;&gt;Makefile&lt;/code&gt; does not work on all the platforms at the time of writing. I have tested the &lt;code class=&quot;highlighter-rouge&quot;&gt;Makefile&lt;/code&gt; on my 64-bit Linux box, and the Linux distribution I am using is &lt;code class=&quot;highlighter-rouge&quot;&gt;Fedora 25&lt;/code&gt;:&lt;/p&gt;
 
 &lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ cat /etc/*release
 Fedora release 25 (Twenty Five)
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
-&lt;p&gt;And I have installed the Wireshark packages:&lt;/p&gt;
+&lt;p&gt;At time of writing, there is a bug in the project which causes the plugin broken in &lt;code class=&quot;highlighter-rouge&quot;&gt;Wireshark 2.x&lt;/code&gt;. I have submitted a PR to fix it (&lt;a href=&quot;https://github.com/jboss-remoting/remoting-wireshark/pull/3&quot;&gt;PR3&lt;/a&gt;) and you can apply the patch if you are running Wireshark 2.x.&lt;/p&gt;
+
+&lt;p&gt;Here are the Wireshark packages provided by Fedora Linux:&lt;/p&gt;
 
 &lt;div class=&quot;highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;$ dnf search wireshark*
 Last metadata expiration check: 23 days, 20:55:45 ago on Sat Apr 29 13:43:24 2017.
@@ -55,10 +55,11 @@ libvirt-wireshark.x86_64 : Wireshark dissector plugin for libvirt RPC transactio
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
-&lt;p&gt;The above packages will provided Wireshark runtime and necessary header files and libraries to build against the remoting project. To compile the project, we can run the &lt;code class=&quot;highlighter-rouge&quot;&gt;make&lt;/code&gt; command in the project directory, and here is the output:&lt;/p&gt;
+&lt;p&gt;The above packages will provide Wireshark runtime and necessary header files and libraries for us to build the remoting project. To compile the project, we can run the &lt;code class=&quot;highlighter-rouge&quot;&gt;make&lt;/code&gt; command in the project directory, and here is the output:&lt;/p&gt;
 
-&lt;p&gt;&lt;img src=&quot;/assets/remoting/make.png&quot; alt=&quot;/assets/remoting/make.png&quot; /&gt;
-The above screenshot displays the compile process of the package, and the final output is &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting.so&lt;/code&gt;:&lt;/p&gt;
+&lt;p&gt;&lt;img src=&quot;/assets/remoting/make.png&quot; alt=&quot;/assets/remoting/make.png&quot; /&gt;&lt;/p&gt;
+
+&lt;p&gt;The above screenshot displays the compile process of the package, and the final output is &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting.so&lt;/code&gt;. Here is the relative output:&lt;/p&gt;
 
 &lt;div class=&quot;language-bash highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;gp&quot;&gt;$ &lt;/span&gt;cc -shared -lwiretap -o remoting.so target/main.o
 &lt;/code&gt;&lt;/pre&gt;
@@ -70,7 +71,7 @@ The above screenshot displays the compile process of the package, and the final 
 &lt;/code&gt;&lt;/pre&gt;
 &lt;/div&gt;
 
-&lt;p&gt;The above command will put the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting.so&lt;/code&gt; into the wireshark plugin diretory defined by Fedora Linux. After the plugin is installed, we can start the Wireshark, and if everything goes fine, the plugin is loaded. We can check the &lt;code class=&quot;highlighter-rouge&quot;&gt;Analyze&lt;/code&gt; tab in the menu and select the &lt;code class=&quot;highlighter-rouge&quot;&gt;Enabled Protocols...&lt;/code&gt; item.&lt;/p&gt;
+&lt;p&gt;The above command will put the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting.so&lt;/code&gt; into the wireshark plugin diretory defined by Fedora Linux. After the plugin is installed, we can start the Wireshark, and if everything goes fine, the plugin will be loaded. We can check the &lt;code class=&quot;highlighter-rouge&quot;&gt;Analyze&lt;/code&gt; tab in the menu and select the &lt;code class=&quot;highlighter-rouge&quot;&gt;Enabled Protocols...&lt;/code&gt; item. Here is the screenshot:&lt;/p&gt;
 
 &lt;p&gt;&lt;img src=&quot;/assets/remoting/option.png&quot; alt=&quot;/assets/remoting/option.png&quot; /&gt;&lt;/p&gt;
 
@@ -78,24 +79,24 @@ The above screenshot displays the compile process of the package, and the final 
 
 &lt;p&gt;&lt;img src=&quot;/assets/remoting/remoting.png&quot; alt=&quot;/assets/remoting/remoting.png&quot; /&gt;&lt;/p&gt;
 
-&lt;p&gt;The above screenshot shows the enabled protocols. Wireshark will enable many protocols by default, so I have put the string &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting&lt;/code&gt; into the &lt;code class=&quot;highlighter-rouge&quot;&gt;Search&lt;/code&gt; field, and it shows that the &lt;code class=&quot;highlighter-rouge&quot;&gt;Remoting&lt;/code&gt; protocol plugin is already enabled.&lt;/p&gt;
+&lt;p&gt;The above screenshot shows the enabled protocols. Wireshark will enable many protocols by default, so I have to put the string &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting&lt;/code&gt; into the &lt;code class=&quot;highlighter-rouge&quot;&gt;Search&lt;/code&gt; field, and it will only show the &lt;code class=&quot;highlighter-rouge&quot;&gt;Remoting&lt;/code&gt; protocol. This process verifies the installation of our &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting.so&lt;/code&gt; plugin.&lt;/p&gt;
 
-&lt;p&gt;To test the plugin, we can use the &lt;code class=&quot;highlighter-rouge&quot;&gt;jboss-remoting&lt;/code&gt; project itself generate some network traffic and let Wireshark capturing it. Here is the URL of the project:&lt;/p&gt;
+&lt;p&gt;To test the plugin, we can use the &lt;code class=&quot;highlighter-rouge&quot;&gt;jboss-remoting&lt;/code&gt; project itself generate some network traffic and let Wireshark capture it. Here is the URL of the project:&lt;/p&gt;
 
 &lt;pre&gt;&lt;code class=&quot;language-url&quot;&gt;https://github.com/jboss-remoting/jboss-remoting
 &lt;/code&gt;&lt;/pre&gt;
 
-&lt;p&gt;You can clone the project and use the &lt;code class=&quot;highlighter-rouge&quot;&gt;mvn install&lt;/code&gt; command to compile and install it into your local machine. I won’t dive into much detail into this part. After the compilation is done, we can run the &lt;code class=&quot;highlighter-rouge&quot;&gt;ConnectionTestCase&lt;/code&gt; provided by the project to generate the network traffic. Here is the screenshot of the class:&lt;/p&gt;
+&lt;p&gt;You can clone the project and use the &lt;code class=&quot;highlighter-rouge&quot;&gt;mvn install&lt;/code&gt; command to compile and install it into your local machine. I won’t dive into many details of these steps because they are quite straightforward. After the compilation is done, we can run the &lt;code class=&quot;highlighter-rouge&quot;&gt;ConnectionTestCase&lt;/code&gt; provided by the project to generate the network traffic. Here is the screenshot of the class:&lt;/p&gt;
 
 &lt;p&gt;&lt;img src=&quot;/assets/remoting/port.png&quot; alt=&quot;/assets/remoting/port.png&quot; /&gt;&lt;/p&gt;
 
-&lt;p&gt;The above screenshot shows the tcp port used by &lt;code class=&quot;highlighter-rouge&quot;&gt;ConnectionTestCase&lt;/code&gt; class is &lt;code class=&quot;highlighter-rouge&quot;&gt;30123&lt;/code&gt;. So we can set Wireshark to listen to &lt;code class=&quot;highlighter-rouge&quot;&gt;lo&lt;/code&gt; loop interface and filter the data packet to show the data transferred via tcp port &lt;code class=&quot;highlighter-rouge&quot;&gt;30123&lt;/code&gt;.&lt;/p&gt;
+&lt;p&gt;The above screenshot shows the tcp port used by &lt;code class=&quot;highlighter-rouge&quot;&gt;ConnectionTestCase&lt;/code&gt; class is &lt;code class=&quot;highlighter-rouge&quot;&gt;30123&lt;/code&gt;, so we can set Wireshark to listen to &lt;code class=&quot;highlighter-rouge&quot;&gt;lo&lt;/code&gt; loop interface and filter the data packet to show the data transferred via tcp port &lt;code class=&quot;highlighter-rouge&quot;&gt;30123&lt;/code&gt;.&lt;/p&gt;
 
 &lt;p&gt;To select the interface to capture, we can select the &lt;code class=&quot;highlighter-rouge&quot;&gt;Capture -&amp;gt; Options...&lt;/code&gt; item as shown in following screenshot:&lt;/p&gt;
 
 &lt;p&gt;&lt;img src=&quot;/assets/remoting/capture.png&quot; alt=&quot;/assets/remoting/capture.png&quot; /&gt;&lt;/p&gt;
 
-&lt;p&gt;After click the above item, we enter the following window:&lt;/p&gt;
+&lt;p&gt;After clicking the above item, we can enter the following window:&lt;/p&gt;
 
 &lt;p&gt;&lt;img src=&quot;/assets/remoting/lo.png&quot; alt=&quot;/assets/remoting/lo.png&quot; /&gt;&lt;/p&gt;
 
@@ -107,14 +108,13 @@ The above screenshot displays the compile process of the package, and the final 
 
 &lt;p&gt;&lt;img src=&quot;/assets/remoting/decode.png&quot; alt=&quot;/assets/remoting/decode.png&quot; /&gt;&lt;/p&gt;
 
-&lt;p&gt;After the clicking the above item, you can see a drop menu that can choose the protocol to use for decoding. Here is the screenshot:&lt;/p&gt;
+&lt;p&gt;After the clicking the above item, you can see a drop menu that can be used to choose the protocol for decoding. Here is the screenshot:&lt;/p&gt;
 
 &lt;p&gt;&lt;img src=&quot;/assets/remoting/select.png&quot; alt=&quot;/assets/remoting/select.png&quot; /&gt;&lt;/p&gt;
 
 &lt;p&gt;And then you can click the &lt;code class=&quot;highlighter-rouge&quot;&gt;TCP port&lt;/code&gt; and a very long droplist will appear. You can select &lt;code class=&quot;highlighter-rouge&quot;&gt;JBoss Remoting&lt;/code&gt; as the protocol, and then the packet will be decoded correctly.&lt;/p&gt;
 
 &lt;p&gt;After the above steps are done, you will see the JBoss Remoting packets displayed in Wireshark window as shown at the beginning of this article.&lt;/p&gt;
-
 </description>
           <pubDate>2017-05-23T00:00:00+00:00</pubDate>
           <link>/2017/05/23/remoting.html</link>
