@@ -139,10 +139,8 @@ wildfly-10.1.0.Final-src     wildfly-10.1.0.Final.zip
 
 <p>The above configuration file contains the <code class="highlighter-rouge">datasources</code> section for the users to configure their database connections. Here is the configuration provided by default:</p>
 
-<div class="language-xml highlighter-rouge"><pre class="highlight"><code><span class="nt">&lt;datasource</span> <span class="na">jndi-name=</span><span class="s">"java:jboss/datasources/ExampleDS"</span> <span class="err">pool-n\</span>
-<span class="na">ame=</span><span class="s">"ExampleDS"</span> <span class="na">enabled=</span><span class="s">"true"</span> <span class="na">use-java-context=</span><span class="s">"true"</span><span class="nt">&gt;</span>
-    <span class="nt">&lt;connection-url&gt;</span>jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DB_CLOSE\
-_ON_EXIT=FALSE<span class="nt">&lt;/connection-url&gt;</span>
+<div class="language-xml highlighter-rouge"><pre class="highlight"><code><span class="nt">&lt;datasource</span> <span class="na">jndi-name=</span><span class="s">"java:jboss/datasources/ExampleDS"</span> <span class="na">pool-name=</span><span class="s">"ExampleDS"</span> <span class="na">enabled=</span><span class="s">"true"</span> <span class="na">use-java-context=</span><span class="s">"true"</span><span class="nt">&gt;</span>
+    <span class="nt">&lt;connection-url&gt;</span>jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE<span class="nt">&lt;/connection-url&gt;</span>
 <span class="nt">&lt;driver&gt;</span>h2<span class="nt">&lt;/driver&gt;</span>
     <span class="nt">&lt;security&gt;</span>
         <span class="nt">&lt;user-name&gt;</span>sa<span class="nt">&lt;/user-name&gt;</span>

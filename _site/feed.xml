@@ -7,6 +7,17 @@
     
       
         <item>
+          <title>All the future articles will be put into weinan.io</title>
+          <description>&lt;p&gt;I’m tired of maintaining two blogs at same time. All the future articles on Wildfly will be put into &lt;a href=&quot;weinan.io&quot;&gt;weinan.io&lt;/a&gt;.&lt;/p&gt;
+</description>
+          <pubDate>2017-05-28T00:00:00+00:00</pubDate>
+          <link>/2017/05/28/future-work.html</link>
+          <guid isPermaLink="true">/2017/05/28/future-work.html</guid>
+        </item>
+      
+    
+      
+        <item>
           <title>Analyzing the JBoss Remoting Protocol</title>
           <description>&lt;p&gt;In this article, I’d like to introduce the &lt;code class=&quot;highlighter-rouge&quot;&gt;remoting-wireshark&lt;/code&gt; (see &lt;a href=&quot;https://github.com/jboss-remoting/remoting-wireshark&quot;&gt;remoting-wireshark&lt;/a&gt;) project. This project is a Wireshark (&lt;a href=&quot;https://www.wireshark.org/&quot;&gt;Wireshark · Go Deep.&lt;/a&gt;) dissector plugin that can decode the JBoss Remoting (see &lt;a href=&quot;http://jbossremoting.jboss.org/&quot;&gt;JBoss Remoting&lt;/a&gt;) protocol.&lt;/p&gt;
 
@@ -1025,10 +1036,8 @@ wildfly-10.1.0.Final-src     wildfly-10.1.0.Final.zip
 
 &lt;p&gt;The above configuration file contains the &lt;code class=&quot;highlighter-rouge&quot;&gt;datasources&lt;/code&gt; section for the users to configure their database connections. Here is the configuration provided by default:&lt;/p&gt;
 
-&lt;div class=&quot;language-xml highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nt&quot;&gt;&amp;lt;datasource&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;jndi-name=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;java:jboss/datasources/ExampleDS&quot;&lt;/span&gt; &lt;span class=&quot;err&quot;&gt;pool-n\&lt;/span&gt;
-&lt;span class=&quot;na&quot;&gt;ame=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;ExampleDS&quot;&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;enabled=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;true&quot;&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;use-java-context=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;true&quot;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;gt;&lt;/span&gt;
-    &lt;span class=&quot;nt&quot;&gt;&amp;lt;connection-url&amp;gt;&lt;/span&gt;jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DB_CLOSE\
-_ON_EXIT=FALSE&lt;span class=&quot;nt&quot;&gt;&amp;lt;/connection-url&amp;gt;&lt;/span&gt;
+&lt;div class=&quot;language-xml highlighter-rouge&quot;&gt;&lt;pre class=&quot;highlight&quot;&gt;&lt;code&gt;&lt;span class=&quot;nt&quot;&gt;&amp;lt;datasource&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;jndi-name=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;java:jboss/datasources/ExampleDS&quot;&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;pool-name=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;ExampleDS&quot;&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;enabled=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;true&quot;&lt;/span&gt; &lt;span class=&quot;na&quot;&gt;use-java-context=&lt;/span&gt;&lt;span class=&quot;s&quot;&gt;&quot;true&quot;&lt;/span&gt;&lt;span class=&quot;nt&quot;&gt;&amp;gt;&lt;/span&gt;
+    &lt;span class=&quot;nt&quot;&gt;&amp;lt;connection-url&amp;gt;&lt;/span&gt;jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE&lt;span class=&quot;nt&quot;&gt;&amp;lt;/connection-url&amp;gt;&lt;/span&gt;
 &lt;span class=&quot;nt&quot;&gt;&amp;lt;driver&amp;gt;&lt;/span&gt;h2&lt;span class=&quot;nt&quot;&gt;&amp;lt;/driver&amp;gt;&lt;/span&gt;
     &lt;span class=&quot;nt&quot;&gt;&amp;lt;security&amp;gt;&lt;/span&gt;
         &lt;span class=&quot;nt&quot;&gt;&amp;lt;user-name&amp;gt;&lt;/span&gt;sa&lt;span class=&quot;nt&quot;&gt;&amp;lt;/user-name&amp;gt;&lt;/span&gt;
