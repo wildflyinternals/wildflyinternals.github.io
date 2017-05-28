@@ -145,10 +145,8 @@ wildfly-10.1.0.Final/standalone/configuration/standalone.xml
 The above configuration file contains the `datasources` section for the users to configure their database connections. Here is the configuration provided by default: 
 
 ```xml
-<datasource jndi-name="java:jboss/datasources/ExampleDS" pool-n\
-ame="ExampleDS" enabled="true" use-java-context="true">
-    <connection-url>jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DB_CLOSE\
-_ON_EXIT=FALSE</connection-url>
+<datasource jndi-name="java:jboss/datasources/ExampleDS" pool-name="ExampleDS" enabled="true" use-java-context="true">
+    <connection-url>jdbc:h2:mem:test;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE</connection-url>
 <driver>h2</driver>
     <security>
         <user-name>sa</user-name>
